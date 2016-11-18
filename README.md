@@ -6,9 +6,21 @@ orginal code can be found under: https://github.com/jcchurch13/Mechaduino-Firmwa
 - added an enable pin (pin 2, only 3.3 V compatible)
 - some other changes 
 - menu entry for generating an step response
-- deletet all modes other then position 
+- deleted all modes other then position 
 - changed all float to integer operations
-- moved the encoder reading in it's own ISR running at 30 kHz
-- added an rolling average to the encoder reading
-- changed the frequency of the PID loop to 4.8 kHz
+- added some filtering to the coil current setting
+- changed the frequency of the PID loop to 25-30 kHz
 
+- Processing script to display the step resonse
+
+
+License
+
+All Mechaduino related materials are released under the Creative Commons Attribution Share-Alike 4.0 License
+Much of the work is based on Mechaduino project:
+https://github.com/jcchurch13/Mechaduino-Firmware
+
+If you want to support me for further improvments and things like that you can send me a small kickback with paypal
+
+
+[![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=64GHBDR3Z55JE)
