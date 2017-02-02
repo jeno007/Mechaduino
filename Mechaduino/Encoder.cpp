@@ -4,8 +4,8 @@
 #include "State.h"
 #include "Configuration.h"
 
-const int positionLPFa = ((100 * exp(positionLPF * -2 * 3.14159283 / FPID))+0.5); // z = e^st pole mapping
-const int positionLPFb = ((100 - positionLPFa)+0.5);
+const int positionLPFa = ((100 * exp(positionLPF * -2 * 3.14159283 / FPID)) + 0.5); // z = e^st pole mapping
+const int positionLPFb = ((100 - positionLPFa) + 0.5);
 
 int readEncoder() {
 
@@ -53,7 +53,7 @@ int readAngle(int last_angle, int last_raw) {
     temp_angle = last_angle  + raw_diff;
   }
 
-  return ((last_angle * positionLPFa) + (temp_angle  * positionLPFb)) / 100;
 
+  return ((last_angle * positionLPFa) + (temp_angle  * positionLPFb)) / 100;
 
 }

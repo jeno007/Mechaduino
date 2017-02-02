@@ -64,26 +64,18 @@ void enaInterrupt() {
 
 
 void calibration() {
-  SerialUSB.println(calibrate_header);
+
   disableTC5Interrupts();
 
-  int encoderReading = 0;
+  int avg = 100;
+
+
+  SerialUSB.println(calibrate_header);
+  enabled = false;
+
+
+  float encoderReading = 0;
   int lastencoderReading = 0;
-
-  int avg = 100;         //how many readings to average
-
-  int iStart = 0;
-  int jStart = 0;
-  int stepNo = 0;
-
-  int readings[3][steps_per_revolution];
-
-  int fullStepReadings[steps_per_revolution];
-  int ticks = 0;
-
-  float lookupAngle = 0.0;
-  float angle_per_step = 360.0 / steps_per_revolution;
-
 
   encoderReading = readEncoder();
 
@@ -93,7 +85,7 @@ void calibration() {
   delay(100);
   oneStep();
 
-  if ((readEncoder - lastencoderReading) < 0)
+  if ((readEncoder() - lastencoderReading) < 0)
   {
     SerialUSB.println("Wired backwards");
     enableTC5Interrupts();
@@ -110,17 +102,18 @@ void calibration() {
 
   step_target = 0;
 
-
   SerialUSB.println("Calibrating fullsteps");
   SerialUSB.println(procent_bar);
   int counter = 0;
   int count = (3 * steps_per_revolution) / 50;
   dir = true;
 
+  //int readings[steps_per_revolution];
+  int readings[3][steps_per_revolution];
   for (int k = 0; k < 3; k++) {
 
     // step to every single fullstep position and read the Encoder
-    for (int x = 0; x < steps_per_revolution; x++) {
+    for (int i = 0; i < steps_per_revolution; i++) {
 
       if (canceled()) return;
       counter += 1;
@@ -134,7 +127,7 @@ void calibration() {
         delayMicroseconds(100);
       }
 
-      readings[k][x] =  (encoderReading / avg);
+      readings[k][i] =  (encoderReading / avg);
 
       if (counter == count) {
         counter = 0;
@@ -144,33 +137,111 @@ void calibration() {
     }
   }
 
-  step_target = 0;
+  float fullStepReadings_raw[steps_per_revolution];
+  for (int i = 0; i < steps_per_revolution; i++) {
+    fullStepReadings_raw[i] = (( 4 * (readings[0][i] + readings[1][i] + readings[2][i]) / 3.0) + 0.5);
+  }
 
   output(0, 0);
+  step_target = 0;
 
-
-  for (int x = 0; x < steps_per_revolution; x++) {
-
-    fullStepReadings[x] = (((readings[0][x] + readings[1][x] + readings[2][x]) / 3.0) + 0.5);
-
+  int perfect[steps_per_revolution];
+  for ( int i = 0; i < steps_per_revolution; i++) {
+    perfect[i] = ((i * 4 * 16384) / 200);
   }
 
   SerialUSB.println();
   SerialUSB.println();
-  SerialUSB.println("checking calibration table");
+
+
+  // find max value in full step readings and index
+  float minimum = 4 * 16384;
+  int idx = 0;
+  for ( int i = 0; i < steps_per_revolution; i++) {
+    if (fullStepReadings_raw[i] < minimum) {
+      minimum = fullStepReadings_raw[i];
+      idx = i;
+    }
+  }
+
+
+  // shift the raw readings to sort them
+  float fullStepReadings[steps_per_revolution];
+  for ( int i = 0; i < steps_per_revolution; i++) {
+    counter = i + idx;
+    if (counter >= steps_per_revolution) {
+      counter = counter - steps_per_revolution;
+    }
+    fullStepReadings[i] = fullStepReadings_raw[counter];
+  }
+
+
+
+  // calculate the error between the measured and perfect lookup
+  float error_raw[steps_per_revolution];
+  for ( int i = 0; i < steps_per_revolution; i++) {
+    error_raw[i] =  (float)(perfect[i]) - (float)(fullStepReadings[i]);
+  }
+
+  float gausian[31] = {0.000888058511381200, 0.00158610663008152, 0.00272176986137680, 0.00448743986440246, 0.00710843674842711, 0.0108187674516528, 0.0158201169212244, 0.0222264351509086, 0.0300025492494709, 0.0389112087983103, 0.0484863518426015, 0.0580487023003957, 0.0667719013138084, 0.0737943634766382, 0.0783575520685465, 0.0799404796215474, 0.0783575520685465, 0.0737943634766382, 0.0667719013138084, 0.0580487023003957, 0.0484863518426015, 0.0389112087983103, 0.0300025492494709, 0.0222264351509086, 0.0158201169212244, 0.0108187674516528, 0.00710843674842711, 0.00448743986440246, 0.00272176986137680, 0.00158610663008152, 0.000888058511381200};
+
+
+  // smooth the fullstep readings with a ring buffer
+  float error[steps_per_revolution];
+  float m;
+  counter = 0;
+  for ( int i = 0; i < steps_per_revolution; i++) {
+    m = 0;
+    counter = 0;
+    int lower = i - 15;
+    int higher = i + 15;
+
+    for (int j = lower; j < higher; j++) {
+      if (j >= steps_per_revolution) {
+        m = m + error_raw[j - 200] * gausian[counter];
+      }
+      else if (j < 0) {
+        m = m + error_raw[j + 200] * gausian[counter];
+      }
+      else {
+        m = m + error_raw[j] * gausian[counter];
+      }
+      counter += 1;
+    }
+    error[i] = m;
+  }
+
+
+  // recalculate the measured angles with the smoothed error
+  float angle_sorted[steps_per_revolution];
+  for ( int i = 0; i < steps_per_revolution; i++) {
+    angle_sorted[i] = (float)(perfect[i]) - (float)(error[i]);
+  }
+
+
+  // shift the sorted angle back
+  int x[steps_per_revolution];
+  for ( int i = 0; i < steps_per_revolution; i++) {
+    counter = i - idx;
+    if (counter < 0) {
+      counter = counter + steps_per_revolution;
+    }
+    x[i] = (angle_sorted[counter] + 0.5);
+  }
+
+  //  calibration check
+  SerialUSB.println("checking fullsteps");
   SerialUSB.println(procent_bar);
-  // end fullsteps
+  counter = 0;
+  count = (steps_per_revolution) / 50;
+  float smoothed_error;
+  for (int i = 0; i < steps_per_revolution; i++) {
 
-
-  // step every fullstep again an check error
-  dir = true;
-  int max_error = 0;
-  int error = 0;
-
-  for (int x = 0; x < steps_per_revolution; x++) {
     if (canceled()) return;
+    counter += 1;
 
-    delay(50);
+    delay(20);
+
     encoderReading = 0;
 
     for (int reading = 0; reading < avg; reading++) {
@@ -178,137 +249,119 @@ void calibration() {
       delayMicroseconds(100);
     }
 
-    error = abs((encoderReading / avg) - fullStepReadings[x]);
+    float temp =  abs((4 * encoderReading / avg) - x[i]);
 
-    if (error > max_error) {
-      max_error = error;
+    if (temp > smoothed_error) {
+      smoothed_error = temp;
     }
 
-    if (x % (steps_per_revolution / 50) == 0) {
+    if (counter == count) {
+      counter = 0;
       SerialUSB.print(".");
     }
-
     oneStep();
   }
 
   SerialUSB.println();
-  SerialUSB.print("max error = ");
-  SerialUSB.print(((float)((100.0 * (float)max_error) / (float)counts_per_revolution)));
+  SerialUSB.print("maximal error = ");
+  SerialUSB.print((100.0 * smoothed_error) / 65536.0);
   SerialUSB.println("%");
-  SerialUSB.println("should be lower than 0.5%");
-  SerialUSB.println();
-
-  SerialUSB.println();
-  
-  SerialUSB.println("//Fullstep measurements : ");
-  SerialUSB.print("//Fullstep[] = {");
+  SerialUSB.println("should be lower than 0.5 %");
+  SerialUSB.println("");
 
 
-  for (int x = 0; x < steps_per_revolution; x++) {
-    SerialUSB.print(fullStepReadings[x]);
-    SerialUSB.print(", ");
-  }
-  SerialUSB.println();
-  SerialUSB.println("};");
-  
 
-  // interpolate between the fullsteps
+
+  // calculate the ticks between the fullsteps
+  float ticks[steps_per_revolution];
+  int low;
+  int high;
+  int iStart = 0;
+  int jStart = 0;
+  int stepNo = 0;
   for (int i = 0; i < steps_per_revolution; i++) {
-    ticks = fullStepReadings[mod((i + 1), steps_per_revolution)] - fullStepReadings[mod((i), steps_per_revolution)];
-    if (ticks < -15000) {
-      ticks += counts_per_revolution;
-    }
-    else if (ticks > 15000) {
-      ticks -= counts_per_revolution;
-    }
+    low = i;
+    high = i + 1;
 
-    if (ticks > 1) {
-      for (int j = 0; j < ticks; j++) {
-        stepNo = (mod(fullStepReadings[i] + j, counts_per_revolution));
-        if (stepNo == 0) {
-          iStart = i;
-          jStart = j;
-        }
-      }
+    if (high >= steps_per_revolution) {
+      high = high - steps_per_revolution;
     }
 
-    if (ticks < 1) {
-      for (int j = -ticks; j > 0; j--) {
-        stepNo = (mod(fullStepReadings[steps_per_revolution - 1 - i] + j, counts_per_revolution));
-        if (stepNo == 0) {
-          iStart = i;
-          jStart = j;
-        }
+    ticks[i] = x[high] - x[low];
 
+    if (ticks[i] < 0) {
+      ticks[i] += (4 * 16384);
+    }
+    else if (ticks[i] > 15000) {
+      ticks[i] -= (4 * 16384);
+    }
+
+    for (int j = 0; j < ticks[i]; j++) {
+      stepNo = (mod(x[i] + j, 4 * 16384));
+      if (stepNo == 0) {
+        iStart = i;
+        jStart = j;
       }
     }
   }
 
+
+  // calculate the lookup table on the fly
+  counter = 0;
+  float angle_per_step = 36000.0 / steps_per_revolution;
+  float lookupAngle;
+  float tick;
 
   SerialUSB.print("const PROGMEM int lookup[] = {");
 
   for (int i = iStart; i < (iStart + steps_per_revolution + 1); i++) {
-    ticks = fullStepReadings[mod((i + 1), steps_per_revolution)] - fullStepReadings[mod((i), steps_per_revolution)];
 
-    if (ticks < -15000) {
-      ticks += counts_per_revolution;
-
+    if (i >= steps_per_revolution) {
+      tick = ticks[i - steps_per_revolution];
     }
-    else if (ticks > 15000) {
-      ticks -= counts_per_revolution;
+    else {
+      tick = ticks[i];
     }
 
-    if (ticks > 1) {
+    if (i == iStart) {
+      for (int j = jStart; j < tick; j++) {
+        counter += 1;
 
-      if (i == iStart) {
-        for (int j = jStart; j < ticks; j++) {
-          lookupAngle = 0.1 * mod(1000 * ((angle_per_step * i) + ((angle_per_step * j ) / float(ticks))), 360000.0);
+        lookupAngle =  mod( (angle_per_step * i) + (((angle_per_step * j ) / tick) + 0.5) , 36000);
+
+        if (mod(counter, 4) == 0) {
           SerialUSB.print(lookupAngle, 0);
-          SerialUSB.print(" , ");
+          SerialUSB.print(", ");
         }
       }
-
-      else if (i == (iStart + steps_per_revolution)) {
-        for (int j = 0; j < jStart; j++) {
-          lookupAngle = 0.1 * mod(1000 * ((angle_per_step * i) + ((angle_per_step * j ) / float(ticks))), 360000.0);
-          SerialUSB.print(lookupAngle, 0);
-          SerialUSB.print(" , ");
-        }
-      }
-      else {
-        for (int j = 0; j < ticks; j++) {
-          lookupAngle = 0.1 * mod(1000 * ((angle_per_step * i) + ((angle_per_step * j ) / float(ticks))), 360000.0);
-          SerialUSB.print(lookupAngle, 0);
-          SerialUSB.print(" , ");
-        }
-      }
-
     }
 
-    else if (ticks < 1) {
-      if (i == iStart) {
-        for (int j = - ticks; j > (jStart); j--) {
-          lookupAngle = 0.1 * mod(1000 * (angle_per_step * (i) + (angle_per_step * ((ticks + j)) / float(ticks))), 360000.0);
-          SerialUSB.print(lookupAngle, 0);
-          SerialUSB.print(" , ");
-        }
-      }
-      else if (i == iStart + steps_per_revolution) {
-        for (int j = jStart; j > 0; j--) {
-          lookupAngle = 0.1 * mod(1000 * (angle_per_step * (i) + (angle_per_step * ((ticks + j)) / float(ticks))), 360000.0);
-          SerialUSB.print(lookupAngle, 0);
-          SerialUSB.print(" , ");
-        }
-      }
-      else {
-        for (int j = - ticks; j > 0; j--) {
-          lookupAngle = 0.1 * mod(1000 * (angle_per_step * (i) + (angle_per_step * ((ticks + j)) / float(ticks))), 360000.0);
-          SerialUSB.print(lookupAngle, 0);
-          SerialUSB.print(" , ");
-        }
-      }
+    else if (i == (iStart + steps_per_revolution)) {
+      for (int j = 0; j < jStart; j++) {
+        counter += 1;
 
+        lookupAngle =  mod( (angle_per_step * i) + (((angle_per_step * j ) / tick) + 0.5) , 36000);
+
+        if (mod(counter, 4) == 0) {
+          SerialUSB.print(lookupAngle, 0);
+          SerialUSB.print(", ");
+        }
+      }
     }
+    else {
+      for (int j = 0; j < tick; j++) {
+        counter += 1;
+
+        lookupAngle =  mod( (angle_per_step * i) + (((angle_per_step * j ) / tick) + 0.5) , 36000);
+
+        if (mod(counter, 4) == 0) {
+          SerialUSB.print(lookupAngle, 0);
+          SerialUSB.print(", ");
+        }
+      }
+    }
+
+
   }
   SerialUSB.println();
   SerialUSB.println("};");
@@ -860,7 +913,6 @@ bool canceled() {
 
 
 bool timed_out(unsigned long now, int time_out) {
-
   if (millis() > now + time_out) {
     SerialUSB.println("");
     SerialUSB.println("timed out!");
@@ -870,11 +922,110 @@ bool timed_out(unsigned long now, int time_out) {
   else {
     return false;
   }
-
 }
 
 
 int sign(int input) {
-  return (input / abs(input));
+  if (abs(input) > input) {
+    return -1;
+  }
+  else {
+    return 1;
+  }
+  //return (input / abs(input));
+}
+
+void boot() {
+  SerialUSB.begin(baudrate);
+
+  delay(500);
+
+  SerialUSB.print("setup pins:");
+  setupPins();
+  SerialUSB.println(" OK");
+
+  SerialUSB.print("setup pins:");
+  setupSPI();
+  SerialUSB.println(" OK");
+
+  SerialUSB.print("setup pins:");
+  setupTCInterrupts();
+  SerialUSB.println(" OK");
+
+
+  delay(1000);
+  SerialUSB.print("setup controller:");
+
+  int i = 0;
+  int raw_0 = (pgm_read_word_near(lookup + readEncoder()));
+  int raw_1 = raw_0;
+  int raw_diff;
+
+  while (i < 200) {
+    raw_0 = (pgm_read_word_near(lookup + readEncoder()));
+
+    raw_diff = raw_0 - raw_1;
+
+    if (raw_diff < -18000) {
+      y = y + 36000 + raw_diff;
+    }
+    else if (raw_diff > 18000) {
+      y = y - 36000 + raw_diff;
+    }
+    else {
+      y = y  + raw_diff;
+    }
+    raw_1 = raw_0;
+    i++;
+  }
+
+  step_target = ((y) / stepangle);
+  SerialUSB.println(" OK");
+
+
+  SerialUSB.print("setup enable pin:");
+#ifdef USE_ENABLE_PIN
+  enaInterrupt();
+#else
+  enabled = true;
+#endif
+  SerialUSB.println(" OK");
+
+
+  SerialUSB.print("setup direction pin:");
+  dirInterrupt();
+  SerialUSB.println(" OK");
+
+  delay(100);
+
+  SerialUSB.print("enable controller:");
+  enableTC5Interrupts(); // get the filter going and ge samples for 1 second
+  SerialUSB.println(" OK");
+  SerialUSB.println("");
+
+
+  SerialUSB.println(bootscreen_1);
+  SerialUSB.println(bootscreen_2);
+  SerialUSB.println(bootscreen_3);
+  SerialUSB.println(bootscreen_4);
+  SerialUSB.println(bootscreen_5);
+  SerialUSB.println(bootscreen_6);
+  SerialUSB.println(bootscreen_7);
+  SerialUSB.println(bootscreen_8);
+  SerialUSB.println(bootscreen_9);
+  SerialUSB.println(bootscreen_10);
+  
+  SerialUSB.print("   compiling date: ");
+  SerialUSB.println(__DATE__);
+  
+  SerialUSB.print("   firmware-version: ");
+  SerialUSB.println(firmware_version);
+  
+  SerialUSB.print("   identifier: ");
+  SerialUSB.println(identifier);
+  SerialUSB.println("");
+
+
+  delay(500);
 }
 
