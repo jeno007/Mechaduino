@@ -17,20 +17,20 @@
 
 
 //---- Enable Pins -----
-#define USE_ENABLE_PIN    //flag for enable pin
+// #define USE_ENABLE_PIN    //flag for enable pin
 
 
 //---- Step settings -----
 #define microstepping 16          // microstepping setting for step input
 #define steps_per_revolution 200  // fullsteps for 360 degrees
-#define mm_rev 32                 // mm per revolution
+#define mm_rev 40                 // mm per revolution
 #define error_led_value 0.05      // max error in mm, if the error gets bigger the led turns off
 
 
 //---- mass of the load in grams ----
 // mass of the load in g
 // can be set to 0 if not known
-#define m_load 300
+#define m_load 1000
 
 
 //---- Invert direction ----
@@ -40,14 +40,14 @@
 //------------------------------------------------ Motor Section ------------------------------------------------
 //---------------------------------------------------------------------------------------------------------------
 // max moment in Nm
-#define M_max 0.59
+#define M_max 0.22 // 0.59
 
 // rated current for max moment in mA
-#define I_rated 2000
+#define I_rated 1330 // 2000
 
 // rotor inertia
 // rotor inertia in gcm^2
-#define J_rotor 82
+#define J_rotor 35 // 82
 
 
 
@@ -56,17 +56,18 @@
 //---------------------------------------------------------------------------------------------------------------
 
 //---- PID Values -----
-#define Kp 1.22900
-#define Ki 0.03300
-#define Kd 11.30900
+#define Kp 2.05700
+#define Ki 0.11800
+#define Kd 8.98200
 
 
 //---- friction compensation ----
-#define Kfr 55.72400
+#define Kfr 87.82100
 
 
 //---- velocity feedforward----
-#define Kvff 15.00000
+#define Kvff 0.00000
+
 
 
 
