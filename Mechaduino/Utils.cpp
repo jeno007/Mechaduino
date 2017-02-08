@@ -182,9 +182,6 @@ void calibration() {
     error_raw[i] =  (float)(perfect[i]) - (float)(fullStepReadings[i]);
   }
 
-  //float gausian[31] = {0.000888058511381200, 0.00158610663008152, 0.00272176986137680, 0.00448743986440246, 0.00710843674842711, 0.0108187674516528, 0.0158201169212244, 0.0222264351509086, 0.0300025492494709, 0.0389112087983103, 0.0484863518426015, 0.0580487023003957, 0.0667719013138084, 0.0737943634766382, 0.0783575520685465, 0.0799404796215474, 0.0783575520685465, 0.0737943634766382, 0.0667719013138084, 0.0580487023003957, 0.0484863518426015, 0.0389112087983103, 0.0300025492494709, 0.0222264351509086, 0.0158201169212244, 0.0108187674516528, 0.00710843674842711, 0.00448743986440246, 0.00272176986137680, 0.00158610663008152, 0.000888058511381200};
-
-
   float gausian[31];
   counter = 0;
   float m;
@@ -197,14 +194,6 @@ void calibration() {
   for (int i = 0; i < 31; i++) {
     gausian[i] =  gausian[i] / m;
   }
-
-  SerialUSB.println();
-  for (int i = 0; i < 31; i++) {
-    SerialUSB.print(gausian[i]);
-    SerialUSB.print(" , ");
-  }
-  SerialUSB.println();
-  SerialUSB.println();
 
 
   // smooth the fullstep readings with a ring buffer
@@ -408,9 +397,12 @@ void oneStep() {
   output(raw_0 , uMAX / 2);
 }
 
+
+
 int mod(int xMod, int mMod) {
   return (xMod % mMod + mMod) % mMod;
 }
+
 
 
 void setupTCInterrupts() {
@@ -946,13 +938,12 @@ bool timed_out(unsigned long now, int time_out) {
 
 
 int sign(int input) {
-  if (abs(input) > input) {
+  if (input < 0) {
     return -1;
   }
   else {
     return 1;
   }
-  //return (input / abs(input));
 }
 
 void boot() {
@@ -1141,6 +1132,20 @@ bool check_lookup(bool output) {
       SerialUSB.println("step between elements to low");
     }
     error = true;
+  }
+
+
+  if (output && !error) {
+    SerialUSB.print("delta value: ");
+    SerialUSB.println(max_dx);
+
+    SerialUSB.print("minimal value: ");
+    SerialUSB.println(minimal);
+
+    SerialUSB.print("maximal value: ");
+    SerialUSB.println(maximal);
+
+    SerialUSB.println("Looks good!");
   }
 
   return error;
