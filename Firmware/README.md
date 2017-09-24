@@ -1,6 +1,8 @@
-![logo](https://github.com/Kaiwol1990/Mechaduino/blob/dev/images/header.PNG)
+![image](https://github.com/Kaiwol1990/Mechaduino/blob/dev/images/arduino.png)
 
 Derivation of the original Mechaduino code from jcchurch13.
+
+Original code can be found under: https://github.com/jcchurch13/Mechaduino-Firmware/tree/multi-file/Mechaduino_01/Mechaduino_01
 
 # Firmware
 ### Changes:
@@ -23,7 +25,6 @@ Derivation of the original Mechaduino code from jcchurch13.
 - simple error register to save if an error occurred
 - LED shows errors by different blinking patterns
 - downhill simplex algorithm to fine tune the pid settings
-
 
 ### LED blink pattern:
 If an error occures the led will switch from constant on to different patterns. These patterns are separated from each other by a longer pause. After this pause one pattern will be shown and then after the pause the next pattern will be shown.
@@ -63,16 +64,6 @@ To get an list of the possible commands send help over the serial monitor
 |testmove -f 2500 -v 60 | Starts a test move with the velocity of 60 mm/s and a sampling rate of 2500 Hz |
 |testmove -v 60 -o | Starts a test move with the velocity of 60 mm/s and the default sampling rate of 5000 Hz. Outputs the sampled points to the serial monitor |
 
-
-
-# Windows GUI
-![image](images/GUI.png)
-- Live view/stream motor parameter (angle, error, effort, ...)
-- generate and analyze different test moves with different sampling rates (step response, dirac delta function, ...)
-- change parameters without the need of serial commands
-- generate a configuration file 
-- Log streamed motor parameter as txt or csv file
-
 # License
 All Mechaduino related materials are released under the Creative Commons Attribution Share-Alike 4.0 License
 https://creativecommons.org/licenses/by-sa/4.0/
@@ -85,3 +76,4 @@ https://github.com/jcchurch13/Mechaduino-Firmware
 If you want to support me for further improvements and things like that, you can send me a small kickback with PayPal
 
 [![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=64GHBDR3Z55JE)
+
